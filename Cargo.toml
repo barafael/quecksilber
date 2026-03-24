@@ -1,0 +1,22 @@
+[package]
+name = "quecksilber"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+iced = { version = "0.14", features = ["canvas"] }
+strum = { version = "0.27", features = ["derive"] }
+thiserror = "2"
+
+[dev-dependencies]
+iced = { version = "0.14", features = ["canvas", "tokio"] }
+image = "0.25"
+rand = "0.8"
+
+[[example]]
+name = "demo"
+path = "examples/demo.rs"
+
+[[example]]
+name = "screenshots"
+path = "examples/screenshots.rs"
