@@ -14,8 +14,8 @@ use iced::{Element, Length, Subscription, Task};
 
 use quecksilber::{
     async_action_button, guarded_button, indicator_panel, mercury_theme, toggle_switch,
-    ActionState, EventTimer, Gauge, GuardState, Indicator, IndicatorStatus, MercuryColors,
-    SelectorDial, StatusBar,
+    ActionState, AttitudeIndicator, EventTimer, Gauge, GuardState, Indicator, IndicatorStatus,
+    MercuryColors, SelectorDial, StatusBar,
 };
 
 fn main() -> iced::Result {
@@ -52,6 +52,7 @@ const SETTLE_FRAMES: u32 = 8;
 
 fn widgets() -> Vec<Widget> {
     vec![
+        Widget { name: "attitude_indicator", build: build_attitude_indicator },
         Widget { name: "indicator", build: build_indicator },
         Widget { name: "indicator_panel", build: build_indicator_panel },
         Widget { name: "gauge", build: build_gauge },
@@ -149,6 +150,16 @@ impl App {
 }
 
 // ── Widget builders ─────────────────────────────────────────────────
+
+fn build_attitude_indicator() -> Element<'static, Message> {
+    let adi = AttitudeIndicator::new(5.0, -3.0, 8.0)
+        .roll_range(-30.0, 30.0)
+        .pitch_range(-20.0, 20.0)
+        .yaw_range(-30.0, 30.0);
+
+    let el: Element<'static, ()> = canvas(adi).width(200).height(200).into();
+    el.map(|_: ()| unreachable!())
+}
 
 fn build_indicator() -> Element<'static, Message> {
     let colors = MercuryColors::default();

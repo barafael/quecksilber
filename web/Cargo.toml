@@ -8,3 +8,4 @@ publish = false
 iced = { version = "0.14", features = ["canvas", "webgl", "fira-sans"] }
 quecksilber = { path = ".." }
 rand = "0.8"
+getrandom = { version = "0.2", features = ["js"] }

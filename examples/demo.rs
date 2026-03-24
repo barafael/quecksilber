@@ -6,8 +6,8 @@ use rand::Rng;
 
 use quecksilber::{
     async_action_button, guarded_button, indicator_panel, mercury_theme, toggle_switch,
-    ActionState, EventTimer, Gauge, GuardState, IndicatorStatus, MercuryColors, SelectorDial,
-    StatusBar,
+    ActionState, AttitudeIndicator, EventTimer, Gauge, GuardState, IndicatorStatus, MercuryColors,
+    SelectorDial, StatusBar,
 };
 
 fn main() -> iced::Result {
@@ -49,6 +49,9 @@ struct App {
     o2_supply: f32,
     dc_volts: f32,
     attitude_rate: f32,
+    roll: f32,
+    pitch: f32,
+    yaw: f32,
     fuel_remaining: f32,
     battery: f32,
     signal: f32,
@@ -92,6 +95,9 @@ impl App {
                 o2_supply: 87.0,
                 dc_volts: 27.5,
                 attitude_rate: 1.5,
+                roll: 2.3,
+                pitch: -1.5,
+                yaw: 0.8,
                 fuel_remaining: 72.0,
                 battery: 91.0,
                 signal: 85.0,
@@ -121,6 +127,9 @@ impl App {
                 self.o2_supply = walk(&mut rng, self.o2_supply, 0.4, 5.0, 99.0);
                 self.dc_volts = walk(&mut rng, self.dc_volts, 0.12, 22.0, 31.0);
                 self.attitude_rate = walk(&mut rng, self.attitude_rate, 0.15, -5.0, 5.0);
+                self.roll = walk(&mut rng, self.roll, 0.5, -30.0, 30.0);
+                self.pitch = walk(&mut rng, self.pitch, 0.3, -20.0, 20.0);
+                self.yaw = walk(&mut rng, self.yaw, 0.5, -30.0, 30.0);
                 self.fuel_remaining = walk(&mut rng, self.fuel_remaining, 0.3, 5.0, 95.0);
                 self.battery = walk(&mut rng, self.battery, 0.25, 10.0, 98.0);
                 self.signal = walk(&mut rng, self.signal, 1.2, 10.0, 98.0);
@@ -196,7 +205,21 @@ impl App {
             .spacing(12)
             .width(300);
 
-        // ── Center: instrument gauges (2x2 grid) ────────────────
+        // ── Center: attitude indicator + instrument gauges ─────────
+        let adi: Element<'_, ()> = canvas(
+            AttitudeIndicator::new(self.roll, self.pitch, self.yaw)
+                .roll_range(-30.0, 30.0)
+                .pitch_range(-20.0, 20.0)
+                .yaw_range(-30.0, 30.0)
+                .colors(colors),
+        )
+        .width(170)
+        .height(170)
+        .into();
+
+        let adi_container = container(adi.map(|_: ()| unreachable!()))
+            .center_x(Length::Fill);
+
         let gauge_size = 170;
 
         let cabin_gauge: Element<'_, ()> = canvas(
@@ -271,7 +294,8 @@ impl App {
         )
         .center_x(Length::Fill);
 
-        let center_col = column![gauge_grid]
+        let center_col = column![adi_container, gauge_grid]
+            .spacing(8)
             .width(Length::Fill)
             .align_x(iced::Alignment::Center);
 

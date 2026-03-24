@@ -5,6 +5,7 @@ pub(crate) mod anim;
 #[allow(dead_code)]
 pub(crate) mod draw;
 pub mod async_action_button;
+pub mod attitude_indicator;
 pub mod event_timer;
 pub mod gauge;
 pub mod guarded_button;
@@ -16,6 +17,7 @@ pub mod toggle_switch;
 
 // Convenience re-exports
 pub use async_action_button::{async_action_button, ActionState};
+pub use attitude_indicator::AttitudeIndicator;
 pub use color::MercuryColors;
 pub use event_timer::EventTimer;
 pub use gauge::Gauge;
