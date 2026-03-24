@@ -224,6 +224,7 @@ impl AttitudeIndicator {
             size: iced::Pixels(10.0),
             align_x: iced::alignment::Horizontal::Center.into(),
             align_y: iced::alignment::Vertical::Center,
+            font: self.colors.font,
             ..Text::default()
         });
 
@@ -241,7 +242,8 @@ impl AttitudeIndicator {
                 size: iced::Pixels(10.0),
                 align_x: iced::alignment::Horizontal::Center.into(),
                 align_y: iced::alignment::Vertical::Center,
-                ..Text::default()
+                font: self.colors.font,
+            ..Text::default()
             });
         }
 
@@ -253,6 +255,7 @@ impl AttitudeIndicator {
             size: iced::Pixels(10.0),
             align_x: iced::alignment::Horizontal::Center.into(),
             align_y: iced::alignment::Vertical::Center,
+            font: self.colors.font,
             ..Text::default()
         });
 

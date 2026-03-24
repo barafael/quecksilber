@@ -205,7 +205,8 @@ impl EventTimer {
                     size: iced::Pixels(9.0),
                     align_x: iced::alignment::Horizontal::Center.into(),
                     align_y: iced::alignment::Vertical::Center,
-                    ..Text::default()
+                    font: self.colors.font,
+            ..Text::default()
                 });
             } else {
                 // Minor tick
@@ -231,6 +232,7 @@ impl EventTimer {
             size: iced::Pixels(10.0),
             align_x: iced::alignment::Horizontal::Center.into(),
             align_y: iced::alignment::Vertical::Center,
+            font: self.colors.font,
             ..Text::default()
         });
 
@@ -248,6 +250,7 @@ impl EventTimer {
             size: iced::Pixels(12.0),
             align_x: iced::alignment::Horizontal::Center.into(),
             align_y: iced::alignment::Vertical::Center,
+            font: self.colors.font,
             ..Text::default()
         });
     }

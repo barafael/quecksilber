@@ -148,6 +148,7 @@ impl canvas::Program<(), Theme, Renderer> for StatusBar {
             size: iced::Pixels(11.0),
             align_x: iced::alignment::Horizontal::Left.into(),
             align_y: iced::alignment::Vertical::Top,
+            font: self.colors.font,
             ..canvas::Text::default()
         });
 
@@ -164,6 +165,7 @@ impl canvas::Program<(), Theme, Renderer> for StatusBar {
             size: iced::Pixels(11.0),
             align_x: iced::alignment::Horizontal::Right.into(),
             align_y: iced::alignment::Vertical::Top,
+            font: self.colors.font,
             ..canvas::Text::default()
         });
 

@@ -223,7 +223,8 @@ impl<Message: Clone + 'static> canvas::Program<Message, Theme, Renderer> for Sel
                 size: iced::Pixels(10.0),
                 align_x: align_x.into(),
                 align_y,
-                ..Text::default()
+                font: self.colors.font,
+            ..Text::default()
             });
         }
 

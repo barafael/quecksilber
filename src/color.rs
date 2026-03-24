@@ -1,10 +1,25 @@
-use iced::Color;
+use iced::{Color, Font};
 
 use crate::indicator::IndicatorStatus;
 
-/// Extended color constants for quecksilber widgets, beyond what iced's `Palette` provides.
+/// Extended color constants and rendering config for quecksilber widgets,
+/// beyond what iced's `Palette` provides.
+///
+/// Includes a `font` field used by all canvas-rendered text. On native this
+/// defaults to `Font::DEFAULT` (system sans-serif). For WASM builds where no
+/// system fonts exist, set this to an explicitly loaded font:
+///
+/// ```ignore
+/// let colors = MercuryColors {
+///     font: Font::with_name("Fira Sans"),
+///     ..MercuryColors::default()
+/// };
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MercuryColors {
+    /// Font used for all canvas-rendered text (gauge labels, tick numbers, etc.).
+    /// Set to `Font::with_name("Fira Sans")` for WASM builds.
+    pub font: Font,
     /// Powered-down / inactive indicator color.
     pub off: Color,
     /// Widget panel surface background.
@@ -51,6 +66,7 @@ impl MercuryColors {
 impl Default for MercuryColors {
     fn default() -> Self {
         Self {
+            font: Font::DEFAULT,
             off: Color::from_rgb8(0x3B, 0x3B, 0x3B),
             panel_bg: Color::from_rgb8(0x16, 0x1B, 0x22),
             bezel: Color::from_rgb8(0x30, 0x36, 0x3D),

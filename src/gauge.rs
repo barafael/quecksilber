@@ -247,7 +247,8 @@ impl Gauge {
                     size: iced::Pixels(10.0),
                     align_x: iced::alignment::Horizontal::Center.into(),
                     align_y: iced::alignment::Vertical::Center,
-                    ..Text::default()
+                    font: self.colors.font,
+            ..Text::default()
                 });
 
                 // Minor ticks between this major and the next
@@ -280,6 +281,7 @@ impl Gauge {
             size: iced::Pixels(11.0),
             align_x: iced::alignment::Horizontal::Center.into(),
             align_y: iced::alignment::Vertical::Center,
+            font: self.colors.font,
             ..Text::default()
         });
 
@@ -291,7 +293,8 @@ impl Gauge {
                 size: iced::Pixels(9.0),
                 align_x: iced::alignment::Horizontal::Center.into(),
                 align_y: iced::alignment::Vertical::Center,
-                ..Text::default()
+                font: self.colors.font,
+            ..Text::default()
             });
         }
     }

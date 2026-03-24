@@ -176,7 +176,12 @@ impl App {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let colors = MercuryColors::default();
+        let colors = {
+            #[cfg(target_arch = "wasm32")]
+            { MercuryColors { font: iced::Font::with_name("Fira Sans"), ..MercuryColors::default() } }
+            #[cfg(not(target_arch = "wasm32"))]
+            { MercuryColors::default() }
+        };
 
         // ── Header ──────────────────────────────────────────────
         let title = text("QUECKSILBER CONTROL")

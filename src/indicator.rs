@@ -176,6 +176,7 @@ impl canvas::Program<(), Theme, Renderer> for Indicator {
             size: iced::Pixels(11.0),
             align_x: iced::alignment::Horizontal::Center.into(),
             align_y: iced::alignment::Vertical::Top,
+            font: self.colors.font,
             ..canvas::Text::default()
         });
 
