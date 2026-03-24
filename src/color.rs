@@ -66,7 +66,14 @@ impl MercuryColors {
 impl Default for MercuryColors {
     fn default() -> Self {
         Self {
-            font: Font::DEFAULT,
+            // On WASM there are no system fonts, so default to Fira Sans
+            // (embedded by iced's `fira-sans` feature). On native, system
+            // sans-serif works fine.
+            font: if cfg!(target_arch = "wasm32") {
+                Font::with_name("Fira Sans")
+            } else {
+                Font::DEFAULT
+            },
             off: Color::from_rgb8(0x3B, 0x3B, 0x3B),
             panel_bg: Color::from_rgb8(0x16, 0x1B, 0x22),
             bezel: Color::from_rgb8(0x30, 0x36, 0x3D),
