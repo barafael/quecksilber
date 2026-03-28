@@ -1,7 +1,7 @@
 use clap::Parser;
 use iced::widget::canvas::{self, Path};
 use iced::{mouse, window, Element, Font, Length, Point, Rectangle, Renderer, Size, Task, Theme};
-use quecksilber::widgets::{ArmStyle, DualGauge, Gauge, Origin, Subdivision};
+use quecksilber::widgets::{ArmStyle, DualGauge, Gauge, Origin, HorizontalGauge, Subdivision};
 use std::sync::OnceLock;
 use std::time::Duration;
 
@@ -120,6 +120,7 @@ fn main() -> iced::Result {
 enum Screenshot {
     GaugeVariant(usize),
     DualGauge,
+    HorizontalGauge,
 }
 
 fn screenshot_list() -> Vec<(&'static str, Screenshot)> {
@@ -129,12 +130,25 @@ fn screenshot_list() -> Vec<(&'static str, Screenshot)> {
         .map(|(i, v)| (v.name, Screenshot::GaugeVariant(i)))
         .collect();
     list.push(("dual_gauge", Screenshot::DualGauge));
+    list.push(("horizontal_gauge", Screenshot::HorizontalGauge));
 
     if let Some(filter) = &ARGS.get().expect("args not set").name {
         list.retain(|(name, _)| *name == filter.as_str());
+        assert!(
+            !list.is_empty(),
+            "no screenshot named '{filter}'. available: {}",
+            screenshot_names().join(", ")
+        );
     }
 
     list
+}
+
+fn screenshot_names() -> Vec<String> {
+    let mut names: Vec<String> = variants().iter().map(|v| v.name.to_string()).collect();
+    names.push("dual_gauge".to_string());
+    names.push("horizontal_gauge".to_string());
+    names
 }
 
 fn boot() -> (State, Task<Message>) {
@@ -163,6 +177,7 @@ fn boot() -> (State, Task<Message>) {
 enum Widget {
     Gauge(Gauge),
     DualGauge(DualGauge),
+    HorizontalGauge(HorizontalGauge),
 }
 
 fn make_gauge(v: &Variant) -> Gauge {
@@ -181,12 +196,19 @@ fn make_gauge(v: &Variant) -> Gauge {
 fn make_widget(variants: &[Variant], screenshot: &Screenshot) -> Widget {
     match screenshot {
         Screenshot::GaugeVariant(i) => Widget::Gauge(make_gauge(&variants[*i])),
+        Screenshot::HorizontalGauge => Widget::HorizontalGauge(
+            HorizontalGauge::new(0.0..=100.0).label_every(20).label("TEMP").value(50.0).font(B612),
+        ),
         Screenshot::DualGauge => Widget::DualGauge(
             DualGauge::new()
                 .top_label("TOP")
                 .right_label("RIGHT")
                 .bottom_label("BOTTOM")
                 .left_label("LEFT")
+                .left_range(0.0..=100.0, 50)
+                .right_range(0.0..=100.0, 20)
+                .left_value(65.0)
+                .right_value(30.0)
                 .font(B612),
         ),
     }
@@ -277,6 +299,7 @@ impl<'a> canvas::Program<Message> for WidgetView<'a> {
         match self.widget {
             Widget::Gauge(gauge) => gauge.draw_at(&mut frame, theme, center, full_radius),
             Widget::DualGauge(dg) => dg.draw_at(&mut frame, theme, center, full_radius),
+            Widget::HorizontalGauge(sg) => sg.draw_at(&mut frame, theme, center, full_radius),
         }
 
         vec![frame.into_geometry()]
