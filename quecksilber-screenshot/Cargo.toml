@@ -1,0 +1,10 @@
+[package]
+name = "quecksilber-screenshot"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+iced = { version = "0.14", features = ["canvas", "tokio"] }
+image = "0.25"
+quecksilber = { path = "../quecksilber" }

@@ -1,0 +1,9 @@
+[package]
+name = "quecksilber-demo"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+iced = { version = "0.14", features = ["canvas", "tokio", "hot"] }
+quecksilber = { path = "../quecksilber" }
+rand = "0.9"

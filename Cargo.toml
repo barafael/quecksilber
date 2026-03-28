@@ -1,0 +1,9 @@
+[workspace]
+
+resolver = "3"
+
+members = [
+    "quecksilber",
+    "quecksilber-screenshot",
+    "quecksilber-demo",
+]
