@@ -26,20 +26,28 @@ jobs:
           sudo apt-get install -y xvfb libxkbcommon-x11-0 libvulkan1 mesa-vulkan-drivers libgl1-mesa-dri
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
 
       - uses: Swatinem/rust-cache@v2
+
+      - name: Install trunk
+        run: cargo install trunk --locked
+
+      - name: Build WASM demo
+        run: trunk build --release --dist _site quecksilber-demo/index.html
 
       - name: Build screenshot tool
         run: cargo build --release -p quecksilber-screenshot
 
-      - name: Capture screenshot
+      - name: Capture screenshots
         run: xvfb-run --auto-servernum cargo run --release -p quecksilber-screenshot
 
-      - name: Build site
+      - name: Build screenshot gallery
         run: |
-          mkdir -p _site
-          cp screenshots/*.png _site/
-          cd _site
+          mkdir -p _site/screenshots
+          cp screenshots/*.png _site/screenshots/
+          cd _site/screenshots
           imgs=""
           for f in *.png; do
             name="${f%.png}"
@@ -51,7 +59,7 @@ jobs:
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>Quecksilber</title>
+            <title>Quecksilber - Widget Gallery</title>
             <style>
               body { margin: 2rem; background: #f5f5f5; font-family: sans-serif; }
               h1 { text-align: center; }
