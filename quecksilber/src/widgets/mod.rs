@@ -1,9 +1,11 @@
+mod attitude_indicator;
 mod dual_gauge;
 mod gauge;
 mod horizontal_gauge;
 mod lever_switch;
 mod rotary_selector;
 
+pub use attitude_indicator::AttitudeIndicator;
 pub use dual_gauge::DualGauge;
 pub use gauge::{ArmStyle, Gauge, Origin, Subdivision};
 pub use horizontal_gauge::HorizontalGauge;

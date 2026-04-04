@@ -4,8 +4,8 @@ use iced::widget::canvas::{self, Path};
 use iced::widget::{Space, container, pick_list, stack};
 use iced::{Element, Font, Length, Rectangle, Renderer, Subscription, Theme, keyboard, mouse};
 use quecksilber::widgets::{
-    ArmStyle, DualGauge, Gauge, HorizontalGauge, LeverOrientation, LeverSwitch, Origin,
-    RotarySelector, Subdivision,
+    ArmStyle, AttitudeIndicator, DualGauge, Gauge, HorizontalGauge, LeverOrientation, LeverSwitch,
+    Origin, RotarySelector, Subdivision,
 };
 use random_walk::RandomWalk;
 use std::time::Duration;
@@ -41,6 +41,10 @@ struct State {
     walk_split2: RandomWalk,
     split3: HorizontalGauge,
     walk_split3: RandomWalk,
+    attitude: AttitudeIndicator,
+    walk_yaw: RandomWalk,
+    walk_pitch: RandomWalk,
+    walk_roll: RandomWalk,
     rotary_selected: usize,
     lever_h3_selected: usize,
     lever_h2_selected: usize,
@@ -139,6 +143,10 @@ impl Default for State {
                 .value(75.0)
                 .font(B612),
             walk_split3: RandomWalk::new(75.0, 0.0, 150.0, 0.1),
+            attitude: AttitudeIndicator::new().label("ATTITUDE").font(B612),
+            walk_yaw: RandomWalk::new(0.0, -60.0, 60.0, 0.05),
+            walk_pitch: RandomWalk::new(0.0, -30.0, 30.0, 0.03),
+            walk_roll: RandomWalk::new(0.0, -45.0, 45.0, 0.04),
             rotary_selected: 2,
             lever_h3_selected: 1,
             lever_h2_selected: 0,
@@ -174,6 +182,9 @@ fn update(state: &mut State, message: Message) {
             state.split1.set_value(state.walk_split1.tick());
             state.split2.set_value(state.walk_split2.tick());
             state.split3.set_value(state.walk_split3.tick());
+            state.attitude.set_yaw(state.walk_yaw.tick());
+            state.attitude.set_pitch(state.walk_pitch.tick());
+            state.attitude.set_roll(state.walk_roll.tick());
         }
         Message::ThemeSelected(theme) => state.theme = theme,
         Message::KeyboardEvent(event) => match event {
@@ -210,6 +221,7 @@ fn view(state: &State) -> Element<'_, Message> {
         split1: &state.split1,
         split2: &state.split2,
         split3: &state.split3,
+        attitude: &state.attitude,
     })
     .width(Length::Fill)
     .height(Length::Fill);
@@ -292,6 +304,7 @@ struct GaugeLayer<'a> {
     split1: &'a HorizontalGauge,
     split2: &'a HorizontalGauge,
     split3: &'a HorizontalGauge,
+    attitude: &'a AttitudeIndicator,
 }
 
 impl<'a> canvas::Program<Message> for GaugeLayer<'a> {
@@ -383,6 +396,18 @@ impl<'a> canvas::Program<Message> for GaugeLayer<'a> {
             iced::Point::new(col2, row(0)),
             gauge_radius,
         );
+
+        // Attitude indicator: 2x size, centered horizontally at top
+        let att_radius = gauge_radius * 2.0;
+        let att_center = iced::Point::new(bounds.width / 2.0, margin + att_radius);
+        self.attitude
+            .draw_at(&mut frame, theme, att_center, att_radius);
+        self.attitude
+            .draw_pitch_arm(&mut frame, theme, att_center, att_radius);
+        self.attitude
+            .draw_roll_arm(&mut frame, theme, att_center, att_radius);
+        self.attitude
+            .draw_yaw_arm(&mut frame, theme, att_center, att_radius);
 
         vec![frame.into_geometry()]
     }

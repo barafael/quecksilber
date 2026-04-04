@@ -3,12 +3,12 @@ use iced::advanced::layout;
 use iced::advanced::renderer;
 use iced::advanced::widget::tree::{self, Tree};
 use iced::advanced::{Clipboard, Layout, Shell, Widget};
+use iced::time::Instant;
 use iced::widget::canvas::{Frame, Path, Stroke};
 use iced::{
     Element, Event, Font, Length, Point, Rectangle, Renderer, Size, Theme, Vector, mouse, window,
 };
 use std::f32::consts::PI;
-use std::time::Instant;
 
 use geometry::Renderer as _;
 use iced::advanced::Renderer as _;

@@ -2,8 +2,8 @@ use clap::Parser;
 use iced::widget::canvas::{self, Path};
 use iced::{Element, Font, Length, Point, Rectangle, Renderer, Size, Task, Theme, mouse, window};
 use quecksilber::widgets::{
-    ArmStyle, DualGauge, Gauge, HorizontalGauge, LeverOrientation, LeverSwitch, Origin,
-    RotarySelector, Subdivision,
+    ArmStyle, AttitudeIndicator, DualGauge, Gauge, HorizontalGauge, LeverOrientation, LeverSwitch,
+    Origin, RotarySelector, Subdivision,
 };
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -158,6 +158,7 @@ enum Screenshot {
     LeverSwitch3Pos2,
     LeverSwitch2,
     LeverSwitchVertical,
+    AttitudeIndicator { yaw: f32, pitch: f32, roll: f32 },
 }
 
 fn screenshot_list() -> Vec<(&'static str, Screenshot)> {
@@ -174,6 +175,46 @@ fn screenshot_list() -> Vec<(&'static str, Screenshot)> {
     list.push(("lever_switch_3_pos2", Screenshot::LeverSwitch3Pos2));
     list.push(("lever_switch_2", Screenshot::LeverSwitch2));
     list.push(("lever_switch_vertical", Screenshot::LeverSwitchVertical));
+    list.push((
+        "attitude_center",
+        Screenshot::AttitudeIndicator {
+            yaw: 0.0,
+            pitch: 0.0,
+            roll: 0.0,
+        },
+    ));
+    list.push((
+        "attitude_pitch_up",
+        Screenshot::AttitudeIndicator {
+            yaw: 0.0,
+            pitch: 25.0,
+            roll: 0.0,
+        },
+    ));
+    list.push((
+        "attitude_roll_left",
+        Screenshot::AttitudeIndicator {
+            yaw: 0.0,
+            pitch: 0.0,
+            roll: -30.0,
+        },
+    ));
+    list.push((
+        "attitude_yaw_right",
+        Screenshot::AttitudeIndicator {
+            yaw: 25.0,
+            pitch: 0.0,
+            roll: 0.0,
+        },
+    ));
+    list.push((
+        "attitude_combined",
+        Screenshot::AttitudeIndicator {
+            yaw: 15.0,
+            pitch: -10.0,
+            roll: 20.0,
+        },
+    ));
 
     if let Some(filter) = &ARGS.get().expect("args not set").name {
         list.retain(|(name, _)| *name == filter.as_str());
@@ -197,6 +238,11 @@ fn screenshot_names() -> Vec<String> {
     names.push("lever_switch_3_pos2".to_string());
     names.push("lever_switch_2".to_string());
     names.push("lever_switch_vertical".to_string());
+    names.push("attitude_center".to_string());
+    names.push("attitude_pitch_up".to_string());
+    names.push("attitude_roll_left".to_string());
+    names.push("attitude_yaw_right".to_string());
+    names.push("attitude_combined".to_string());
     names
 }
 
@@ -227,6 +273,7 @@ enum Widget {
     Gauge(Gauge),
     DualGauge(DualGauge),
     HorizontalGauge(HorizontalGauge),
+    AttitudeIndicator(AttitudeIndicator),
     RotarySelector {
         selected: usize,
     },
@@ -311,6 +358,14 @@ fn make_widget(variants: &[Variant], screenshot: &Screenshot) -> Widget {
             labels: vec!["READY", "OFF"],
             title: "",
         },
+        Screenshot::AttitudeIndicator { yaw, pitch, roll } => Widget::AttitudeIndicator(
+            AttitudeIndicator::new()
+                .label("ATTITUDE")
+                .yaw(*yaw)
+                .pitch(*pitch)
+                .roll(*roll)
+                .font(B612),
+        ),
     }
 }
 
@@ -406,6 +461,12 @@ impl<'a> canvas::Program<Message> for WidgetView<'a> {
             Widget::Gauge(gauge) => gauge.draw_at(&mut frame, theme, center, full_radius),
             Widget::DualGauge(dg) => dg.draw_at(&mut frame, theme, center, full_radius),
             Widget::HorizontalGauge(sg) => sg.draw_at(&mut frame, theme, center, full_radius),
+            Widget::AttitudeIndicator(ai) => {
+                ai.draw_at(&mut frame, theme, center, full_radius);
+                ai.draw_pitch_arm(&mut frame, theme, center, full_radius);
+                ai.draw_roll_arm(&mut frame, theme, center, full_radius);
+                ai.draw_yaw_arm(&mut frame, theme, center, full_radius);
+            }
             Widget::RotarySelector { selected } => {
                 let rs = RotarySelector::new(vec!["OFF", "1", "2", "3", "BOTH"], *selected, |_| {})
                     .left_label("L")
