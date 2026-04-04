@@ -35,7 +35,8 @@ jobs:
         run: cargo install trunk --locked
 
       - name: Build WASM demo
-        run: trunk build --release --dist _site quecksilber-demo/index.html
+        working-directory: quecksilber-demo
+        run: trunk build --release --dist ../_site
 
       - name: Build screenshot tool
         run: cargo build --release -p quecksilber-screenshot
