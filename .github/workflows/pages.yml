@@ -38,8 +38,14 @@ jobs:
       - name: Build site
         run: |
           mkdir -p _site
-          cp screenshots/demo.png _site/demo.png
-          cat > _site/index.html << 'HTMLEOF'
+          cp screenshots/*.png _site/
+          cd _site
+          imgs=""
+          for f in *.png; do
+            name="${f%.png}"
+            imgs="$imgs<figure><img src=\"$f\" alt=\"$name\"><figcaption>$name</figcaption></figure>"
+          done
+          cat > index.html << HTMLEOF
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -47,12 +53,17 @@ jobs:
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <title>Quecksilber</title>
             <style>
-              body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f5f5f5; }
-              img { max-width: 100%; height: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+              body { margin: 2rem; background: #f5f5f5; font-family: sans-serif; }
+              h1 { text-align: center; }
+              .grid { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
+              figure { margin: 0; text-align: center; }
+              img { width: 200px; height: 200px; object-fit: contain; box-shadow: 0 2px 8px rgba(0,0,0,0.15); background: white; }
+              figcaption { font-size: 0.85rem; color: #555; margin-top: 0.3rem; }
             </style>
           </head>
           <body>
-            <img src="demo.png" alt="Quecksilber demo screenshot">
+            <h1>Quecksilber Widget Gallery</h1>
+            <div class="grid">$imgs</div>
           </body>
           </html>
           HTMLEOF
