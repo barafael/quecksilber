@@ -4,8 +4,8 @@ use iced::widget::canvas::{self, Path};
 use iced::widget::{Space, container, pick_list, stack};
 use iced::{Element, Font, Length, Rectangle, Renderer, Subscription, Theme, keyboard, mouse};
 use quecksilber::widgets::{
-    ArmStyle, AttitudeIndicator, DualGauge, Gauge, HorizontalGauge, LeverOrientation, LeverSwitch,
-    Origin, RotarySelector, Subdivision,
+    ArmStyle, AttitudeIndicator, AttitudeRateIndicator, DualGauge, Gauge, HorizontalGauge,
+    LeverOrientation, LeverSwitch, Origin, RotarySelector, Subdivision,
 };
 use random_walk::RandomWalk;
 use std::time::Duration;
@@ -41,6 +41,7 @@ struct State {
     walk_split2: RandomWalk,
     split3: HorizontalGauge,
     walk_split3: RandomWalk,
+    rate_indicator: AttitudeRateIndicator,
     attitude: AttitudeIndicator,
     walk_yaw: RandomWalk,
     walk_pitch: RandomWalk,
@@ -111,42 +112,43 @@ impl Default for State {
             .font(B612);
         Self {
             gauge_pressure,
-            walk_pressure: RandomWalk::new(7.0, 0.0, 15.0, 0.02),
+            walk_pressure: RandomWalk::new(7.0, 0.0, 15.0, 0.03),
             gauge_air,
-            walk_air: RandomWalk::new(120.0, 0.0, 240.0, 0.5),
+            walk_air: RandomWalk::new(120.0, 0.0, 240.0, 0.025),
             gauge_percent,
-            walk_percent: RandomWalk::new(50.0, 0.0, 100.0, 0.1),
+            walk_percent: RandomWalk::new(50.0, 0.0, 100.0, 0.03),
             gauge_coolant,
-            walk_coolant: RandomWalk::new(50.0, 0.0, 100.0, 0.08),
+            walk_coolant: RandomWalk::new(50.0, 0.0, 100.0, 0.025),
             gauge_co2,
-            walk_co2: RandomWalk::new(2.0, 0.0, 4.0, 0.005),
+            walk_co2: RandomWalk::new(2.0, 0.0, 4.0, 0.03),
             dual,
-            walk_dual_left: RandomWalk::new(65.0, 0.0, 100.0, 0.08),
-            walk_dual_right: RandomWalk::new(42.0, 0.0, 100.0, 0.06),
+            walk_dual_left: RandomWalk::new(65.0, 0.0, 100.0, 0.025),
+            walk_dual_right: RandomWalk::new(42.0, 0.0, 100.0, 0.02),
             split1: HorizontalGauge::new(0.0, 30.0)
                 .label_every(10)
                 .tick_every(5)
                 .label("DC\nVOLTS")
                 .value(15.0)
                 .font(B612),
-            walk_split1: RandomWalk::new(15.0, 0.0, 30.0, 0.05),
+            walk_split1: RandomWalk::new(15.0, 0.0, 30.0, 0.03),
             split2: HorizontalGauge::new(0.0, 50.0)
                 .label_every(10)
                 .label("DC\nAMPS")
                 .value(25.0)
                 .font(B612),
-            walk_split2: RandomWalk::new(25.0, 0.0, 50.0, 0.08),
+            walk_split2: RandomWalk::new(25.0, 0.0, 50.0, 0.03),
             split3: HorizontalGauge::new(0.0, 150.0)
                 .label_every(50)
                 .tick_every(10)
                 .label("AC\nVOLTS")
                 .value(75.0)
                 .font(B612),
-            walk_split3: RandomWalk::new(75.0, 0.0, 150.0, 0.1),
+            walk_split3: RandomWalk::new(75.0, 0.0, 150.0, 0.03),
+            rate_indicator: AttitudeRateIndicator::new().font(B612),
             attitude: AttitudeIndicator::new().label("ATTITUDE").font(B612),
-            walk_yaw: RandomWalk::new(0.0, -60.0, 60.0, 0.05),
-            walk_pitch: RandomWalk::new(0.0, -30.0, 30.0, 0.03),
-            walk_roll: RandomWalk::new(0.0, -45.0, 45.0, 0.04),
+            walk_yaw: RandomWalk::new(0.0, -60.0, 60.0, 0.02),
+            walk_pitch: RandomWalk::new(0.0, -30.0, 30.0, 0.02),
+            walk_roll: RandomWalk::new(0.0, -45.0, 45.0, 0.02),
             rotary_selected: 2,
             lever_h3_selected: 1,
             lever_h2_selected: 0,
@@ -182,9 +184,15 @@ fn update(state: &mut State, message: Message) {
             state.split1.set_value(state.walk_split1.tick());
             state.split2.set_value(state.walk_split2.tick());
             state.split3.set_value(state.walk_split3.tick());
-            state.attitude.set_yaw(state.walk_yaw.tick());
-            state.attitude.set_pitch(state.walk_pitch.tick());
-            state.attitude.set_roll(state.walk_roll.tick());
+            let yaw = state.walk_yaw.tick();
+            state.attitude.set_yaw(yaw);
+            state.rate_indicator.set_yaw(yaw / 360.0);
+            let pitch = state.walk_pitch.tick();
+            state.attitude.set_pitch(pitch);
+            state.rate_indicator.set_pitch(pitch / 90.0);
+            let roll = state.walk_roll.tick();
+            state.attitude.set_roll(roll);
+            state.rate_indicator.set_roll(roll / 90.0);
         }
         Message::ThemeSelected(theme) => state.theme = theme,
         Message::KeyboardEvent(event) => match event {
@@ -221,6 +229,7 @@ fn view(state: &State) -> Element<'_, Message> {
         split1: &state.split1,
         split2: &state.split2,
         split3: &state.split3,
+        rate_indicator: &state.rate_indicator,
         attitude: &state.attitude,
     })
     .width(Length::Fill)
@@ -304,6 +313,7 @@ struct GaugeLayer<'a> {
     split1: &'a HorizontalGauge,
     split2: &'a HorizontalGauge,
     split3: &'a HorizontalGauge,
+    rate_indicator: &'a AttitudeRateIndicator,
     attitude: &'a AttitudeIndicator,
 }
 
@@ -397,9 +407,41 @@ impl<'a> canvas::Program<Message> for GaugeLayer<'a> {
             gauge_radius,
         );
 
-        // Attitude indicator: 2x size, centered horizontally at top
+        // Attitude indicator
         let att_radius = gauge_radius * 2.0;
         let att_center = iced::Point::new(bounds.width / 2.0, margin + att_radius);
+
+        // AttitudeRateIndicator: below the attitude indicator
+        let rate_indicator_half = att_radius * 1.4;
+        let rate_indicator_center_y =
+            att_center.y + att_radius + rate_indicator_half + margin * 0.5;
+        let rate_indicator_center = iced::Point::new(bounds.width / 2.0, rate_indicator_center_y);
+        self.rate_indicator.draw_at(
+            &mut frame,
+            theme,
+            rate_indicator_center,
+            rate_indicator_half,
+        );
+        self.rate_indicator.draw_roll_arm(
+            &mut frame,
+            theme,
+            rate_indicator_center,
+            rate_indicator_half,
+        );
+        self.rate_indicator.draw_yaw_tape(
+            &mut frame,
+            theme,
+            rate_indicator_center,
+            rate_indicator_half,
+        );
+        self.rate_indicator.draw_pitch_tape(
+            &mut frame,
+            theme,
+            rate_indicator_center,
+            rate_indicator_half,
+        );
+
+        // Attitude indicator on top of rate_indicator
         self.attitude
             .draw_at(&mut frame, theme, att_center, att_radius);
         self.attitude

@@ -150,7 +150,7 @@ impl AttitudeIndicator {
 
         // Side labels
         let label_size = half_side * 0.173;
-        let label_gap = half_side * 0.16;
+        let label_gap = half_side * 0.22;
 
         // "ROLL" above the top side
         frame.fill_text(crate::centered_text(

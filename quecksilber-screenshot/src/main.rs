@@ -2,8 +2,8 @@ use clap::Parser;
 use iced::widget::canvas::{self, Path};
 use iced::{Element, Font, Length, Point, Rectangle, Renderer, Size, Task, Theme, mouse, window};
 use quecksilber::widgets::{
-    ArmStyle, AttitudeIndicator, DualGauge, Gauge, HorizontalGauge, LeverOrientation, LeverSwitch,
-    Origin, RotarySelector, Subdivision,
+    ArmStyle, AttitudeIndicator, AttitudeRateIndicator, DualGauge, Gauge, HorizontalGauge,
+    LeverOrientation, LeverSwitch, Origin, RotarySelector, Subdivision,
 };
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -159,6 +159,7 @@ enum Screenshot {
     LeverSwitch2,
     LeverSwitchVertical,
     AttitudeIndicator { yaw: f32, pitch: f32, roll: f32 },
+    AttitudeRateIndicator,
 }
 
 fn screenshot_list() -> Vec<(&'static str, Screenshot)> {
@@ -215,6 +216,7 @@ fn screenshot_list() -> Vec<(&'static str, Screenshot)> {
             roll: 20.0,
         },
     ));
+    list.push(("attitude_rate_indicator", Screenshot::AttitudeRateIndicator));
 
     if let Some(filter) = &ARGS.get().expect("args not set").name {
         list.retain(|(name, _)| *name == filter.as_str());
@@ -243,6 +245,7 @@ fn screenshot_names() -> Vec<String> {
     names.push("attitude_roll_left".to_string());
     names.push("attitude_yaw_right".to_string());
     names.push("attitude_combined".to_string());
+    names.push("attitude_rate_indicator".to_string());
     names
 }
 
@@ -274,6 +277,7 @@ enum Widget {
     DualGauge(DualGauge),
     HorizontalGauge(HorizontalGauge),
     AttitudeIndicator(AttitudeIndicator),
+    AttitudeRateIndicator(AttitudeRateIndicator),
     RotarySelector {
         selected: usize,
     },
@@ -364,6 +368,13 @@ fn make_widget(variants: &[Variant], screenshot: &Screenshot) -> Widget {
                 .yaw(*yaw)
                 .pitch(*pitch)
                 .roll(*roll)
+                .font(B612),
+        ),
+        Screenshot::AttitudeRateIndicator => Widget::AttitudeRateIndicator(
+            AttitudeRateIndicator::new()
+                .roll(0.28)
+                .yaw(0.375)
+                .pitch(0.17)
                 .font(B612),
         ),
     }
@@ -461,6 +472,12 @@ impl<'a> canvas::Program<Message> for WidgetView<'a> {
             Widget::Gauge(gauge) => gauge.draw_at(&mut frame, theme, center, full_radius),
             Widget::DualGauge(dg) => dg.draw_at(&mut frame, theme, center, full_radius),
             Widget::HorizontalGauge(sg) => sg.draw_at(&mut frame, theme, center, full_radius),
+            Widget::AttitudeRateIndicator(p) => {
+                p.draw_at(&mut frame, theme, center, full_radius);
+                p.draw_roll_arm(&mut frame, theme, center, full_radius);
+                p.draw_yaw_tape(&mut frame, theme, center, full_radius);
+                p.draw_pitch_tape(&mut frame, theme, center, full_radius);
+            }
             Widget::AttitudeIndicator(ai) => {
                 ai.draw_at(&mut frame, theme, center, full_radius);
                 ai.draw_pitch_arm(&mut frame, theme, center, full_radius);
