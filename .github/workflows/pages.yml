@@ -36,7 +36,7 @@ jobs:
 
       - name: Build WASM demo
         working-directory: quecksilber-demo
-        run: trunk build --release --dist ../_site
+        run: trunk build --release --dist ../_site --public-url /quecksilber/
 
       - name: Build screenshot tool
         run: cargo build --release -p quecksilber-screenshot
