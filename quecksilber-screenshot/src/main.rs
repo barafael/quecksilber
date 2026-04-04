@@ -1,7 +1,10 @@
 use clap::Parser;
 use iced::widget::canvas::{self, Path};
-use iced::{mouse, window, Element, Font, Length, Point, Rectangle, Renderer, Size, Task, Theme};
-use quecksilber::widgets::{ArmStyle, DualGauge, Gauge, Origin, HorizontalGauge, Subdivision};
+use iced::{Element, Font, Length, Point, Rectangle, Renderer, Size, Task, Theme, mouse, window};
+use quecksilber::widgets::{
+    ArmStyle, DualGauge, Gauge, HorizontalGauge, LeverOrientation, LeverSwitch, Origin,
+    RotarySelector, Subdivision,
+};
 use std::sync::OnceLock;
 use std::time::Duration;
 
@@ -39,13 +42,41 @@ const DEFAULT: Variant = Variant {
 
 fn variants() -> Vec<Variant> {
     vec![
-        Variant { name: "sub_none", subdivision: Subdivision::None, ..DEFAULT },
-        Variant { name: "sub_integer", ..DEFAULT },
-        Variant { name: "sub_mid_only", subdivision: Subdivision::None, mid_ticks: true, ..DEFAULT },
-        Variant { name: "sub_integer_mid", mid_ticks: true, ..DEFAULT },
-        Variant { name: "origin_centered", origin: Origin::Centered, ..DEFAULT },
-        Variant { name: "origin_left", origin: Origin::Left, ..DEFAULT },
-        Variant { name: "origin_right", origin: Origin::Right, ..DEFAULT },
+        Variant {
+            name: "sub_none",
+            subdivision: Subdivision::None,
+            ..DEFAULT
+        },
+        Variant {
+            name: "sub_integer",
+            ..DEFAULT
+        },
+        Variant {
+            name: "sub_mid_only",
+            subdivision: Subdivision::None,
+            mid_ticks: true,
+            ..DEFAULT
+        },
+        Variant {
+            name: "sub_integer_mid",
+            mid_ticks: true,
+            ..DEFAULT
+        },
+        Variant {
+            name: "origin_centered",
+            origin: Origin::Centered,
+            ..DEFAULT
+        },
+        Variant {
+            name: "origin_left",
+            origin: Origin::Left,
+            ..DEFAULT
+        },
+        Variant {
+            name: "origin_right",
+            origin: Origin::Right,
+            ..DEFAULT
+        },
         Variant {
             name: "centered_100_mid",
             origin: Origin::Centered,
@@ -121,6 +152,12 @@ enum Screenshot {
     GaugeVariant(usize),
     DualGauge,
     HorizontalGauge,
+    RotarySelector,
+    LeverSwitch3Pos0,
+    LeverSwitch3Pos1,
+    LeverSwitch3Pos2,
+    LeverSwitch2,
+    LeverSwitchVertical,
 }
 
 fn screenshot_list() -> Vec<(&'static str, Screenshot)> {
@@ -131,6 +168,12 @@ fn screenshot_list() -> Vec<(&'static str, Screenshot)> {
         .collect();
     list.push(("dual_gauge", Screenshot::DualGauge));
     list.push(("horizontal_gauge", Screenshot::HorizontalGauge));
+    list.push(("rotary_selector", Screenshot::RotarySelector));
+    list.push(("lever_switch_3_pos0", Screenshot::LeverSwitch3Pos0));
+    list.push(("lever_switch_3_pos1", Screenshot::LeverSwitch3Pos1));
+    list.push(("lever_switch_3_pos2", Screenshot::LeverSwitch3Pos2));
+    list.push(("lever_switch_2", Screenshot::LeverSwitch2));
+    list.push(("lever_switch_vertical", Screenshot::LeverSwitchVertical));
 
     if let Some(filter) = &ARGS.get().expect("args not set").name {
         list.retain(|(name, _)| *name == filter.as_str());
@@ -148,6 +191,12 @@ fn screenshot_names() -> Vec<String> {
     let mut names: Vec<String> = variants().iter().map(|v| v.name.to_string()).collect();
     names.push("dual_gauge".to_string());
     names.push("horizontal_gauge".to_string());
+    names.push("rotary_selector".to_string());
+    names.push("lever_switch_3_pos0".to_string());
+    names.push("lever_switch_3_pos1".to_string());
+    names.push("lever_switch_3_pos2".to_string());
+    names.push("lever_switch_2".to_string());
+    names.push("lever_switch_vertical".to_string());
     names
 }
 
@@ -178,11 +227,20 @@ enum Widget {
     Gauge(Gauge),
     DualGauge(DualGauge),
     HorizontalGauge(HorizontalGauge),
+    RotarySelector {
+        selected: usize,
+    },
+    LeverSwitch {
+        positions: usize,
+        selected: usize,
+        orientation: LeverOrientation,
+        labels: Vec<&'static str>,
+        title: &'static str,
+    },
 }
 
 fn make_gauge(v: &Variant) -> Gauge {
-    let mid = (v.range.0 + v.range.1) / 2.0;
-    Gauge::new(v.range.0..=v.range.1, mid)
+    Gauge::new(v.range.0, v.range.1)
         .label_every(v.label_every)
         .label("CABIN\nPRESSURE")
         .gap(v.gap)
@@ -196,8 +254,13 @@ fn make_gauge(v: &Variant) -> Gauge {
 fn make_widget(variants: &[Variant], screenshot: &Screenshot) -> Widget {
     match screenshot {
         Screenshot::GaugeVariant(i) => Widget::Gauge(make_gauge(&variants[*i])),
+        Screenshot::RotarySelector => Widget::RotarySelector { selected: 2 },
         Screenshot::HorizontalGauge => Widget::HorizontalGauge(
-            HorizontalGauge::new(0.0..=100.0).label_every(20).label("TEMP").value(50.0).font(B612),
+            HorizontalGauge::new(0.0, 100.0)
+                .label_every(20)
+                .label("TEMP")
+                .value(50.0)
+                .font(B612),
         ),
         Screenshot::DualGauge => Widget::DualGauge(
             DualGauge::new()
@@ -205,12 +268,49 @@ fn make_widget(variants: &[Variant], screenshot: &Screenshot) -> Widget {
                 .right_label("RIGHT")
                 .bottom_label("BOTTOM")
                 .left_label("LEFT")
-                .left_range(0.0..=100.0, 50)
-                .right_range(0.0..=100.0, 20)
+                .left_range(0.0, 100.0)
+                .left_label_every(50)
+                .right_range(0.0, 100.0)
+                .right_label_every(20)
                 .left_value(65.0)
                 .right_value(30.0)
                 .font(B612),
         ),
+        Screenshot::LeverSwitch3Pos0 => Widget::LeverSwitch {
+            positions: 3,
+            selected: 0,
+            orientation: LeverOrientation::Horizontal,
+            labels: vec!["AUTO", "OFF", "MAN"],
+            title: "STDBY BAT",
+        },
+        Screenshot::LeverSwitch3Pos1 => Widget::LeverSwitch {
+            positions: 3,
+            selected: 1,
+            orientation: LeverOrientation::Horizontal,
+            labels: vec!["AUTO", "OFF", "MAN"],
+            title: "STDBY BAT",
+        },
+        Screenshot::LeverSwitch3Pos2 => Widget::LeverSwitch {
+            positions: 3,
+            selected: 2,
+            orientation: LeverOrientation::Horizontal,
+            labels: vec!["AUTO", "OFF", "MAN"],
+            title: "STDBY BAT",
+        },
+        Screenshot::LeverSwitch2 => Widget::LeverSwitch {
+            positions: 2,
+            selected: 0,
+            orientation: LeverOrientation::Horizontal,
+            labels: vec!["NORM", "OFF"],
+            title: "",
+        },
+        Screenshot::LeverSwitchVertical => Widget::LeverSwitch {
+            positions: 2,
+            selected: 1,
+            orientation: LeverOrientation::Vertical,
+            labels: vec!["READY", "OFF"],
+            title: "",
+        },
     }
 }
 
@@ -243,8 +343,14 @@ fn update(state: &mut State, message: Message) -> Task<Message> {
                 async move {
                     std::fs::create_dir_all("screenshots")
                         .expect("failed to create screenshots dir");
-                    image::save_buffer(&path, &rgba, size.width, size.height, image::ColorType::Rgba8)
-                        .expect("failed to save screenshot");
+                    image::save_buffer(
+                        &path,
+                        &rgba,
+                        size.width,
+                        size.height,
+                        image::ColorType::Rgba8,
+                    )
+                    .expect("failed to save screenshot");
                 },
                 |()| Message::Saved,
             )
@@ -300,6 +406,27 @@ impl<'a> canvas::Program<Message> for WidgetView<'a> {
             Widget::Gauge(gauge) => gauge.draw_at(&mut frame, theme, center, full_radius),
             Widget::DualGauge(dg) => dg.draw_at(&mut frame, theme, center, full_radius),
             Widget::HorizontalGauge(sg) => sg.draw_at(&mut frame, theme, center, full_radius),
+            Widget::RotarySelector { selected } => {
+                let rs = RotarySelector::new(vec!["OFF", "1", "2", "3", "BOTH"], *selected, |_| {})
+                    .left_label("L")
+                    .right_label("R")
+                    .font(B612);
+                rs.draw_at(&mut frame, theme, center, full_radius);
+            }
+            Widget::LeverSwitch {
+                positions,
+                selected,
+                orientation,
+                labels,
+                title,
+            } => {
+                let ls = LeverSwitch::new(*positions, *selected, |_| {})
+                    .orientation(*orientation)
+                    .labels(labels.clone())
+                    .title(*title)
+                    .font(B612);
+                ls.draw_at(&mut frame, theme, center, full_radius);
+            }
         }
 
         vec![frame.into_geometry()]

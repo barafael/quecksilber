@@ -1,16 +1,16 @@
 mod random_walk;
 
 use iced::widget::canvas::{self, Path};
-use iced::widget::{container, pick_list, stack, Space};
-use iced::{
-    keyboard, mouse, Element, Font, Length, Rectangle, Renderer, Subscription, Theme,
+use iced::widget::{Space, container, pick_list, stack};
+use iced::{Element, Font, Length, Rectangle, Renderer, Subscription, Theme, keyboard, mouse};
+use quecksilber::widgets::{
+    ArmStyle, DualGauge, Gauge, HorizontalGauge, LeverOrientation, LeverSwitch, Origin,
+    RotarySelector, Subdivision,
 };
-use quecksilber::widgets::{ArmStyle, DualGauge, Gauge, Origin, HorizontalGauge, Subdivision};
 use random_walk::RandomWalk;
 use std::time::Duration;
 
 const B612: Font = Font::with_name("B612");
-
 
 fn main() -> iced::Result {
     iced::application(State::default, update, view)
@@ -39,6 +39,12 @@ struct State {
     walk_split1: RandomWalk,
     split2: HorizontalGauge,
     walk_split2: RandomWalk,
+    split3: HorizontalGauge,
+    walk_split3: RandomWalk,
+    rotary_selected: usize,
+    lever_h3_selected: usize,
+    lever_h2_selected: usize,
+    lever_v2_selected: usize,
     theme: Theme,
     themes: Vec<Theme>,
     ctrl_held: bool,
@@ -50,12 +56,12 @@ impl Default for State {
         let mut themes: Vec<Theme> = Theme::ALL.to_vec();
         themes.push(cockpit.clone());
 
-        let gauge_pressure = Gauge::new(0.0..=15.0, 7.0)
+        let gauge_pressure = Gauge::new(0.0, 15.0)
             .label_every(3)
             .label("CABIN\nPRESSURE")
             .gap(0.3)
             .font(B612);
-        let gauge_air = Gauge::new(0.0..=240.0, 120.0)
+        let gauge_air = Gauge::new(0.0, 240.0)
             .label_every(20)
             .label("CABIN\nAIR")
             .gap(0.2)
@@ -64,14 +70,14 @@ impl Default for State {
             .subdivision(Subdivision::Every(2))
             .mid_ticks(true)
             .arm_style(ArmStyle::Needle);
-        let gauge_percent = Gauge::new(0.0..=100.0, 50.0)
+        let gauge_percent = Gauge::new(0.0, 100.0)
             .label_every(20)
             .label("Percent")
             .upper_label("RELATIVE\nHUMIDITY")
             .gap(0.3)
             .font(B612)
             .subdivision(Subdivision::Every(5));
-        let gauge_coolant = Gauge::new(0.0..=100.0, 50.0)
+        let gauge_coolant = Gauge::new(0.0, 100.0)
             .label_every(10)
             .label("PER CENT\nREMAINING")
             .upper_label("COOLANT\nQUANTITY")
@@ -80,7 +86,7 @@ impl Default for State {
             .origin(Origin::Right)
             .subdivision(Subdivision::Every(5))
             .arm_style(ArmStyle::Slim);
-        let gauge_co2 = Gauge::new(0.0..=4.0, 2.0)
+        let gauge_co2 = Gauge::new(0.0, 4.0)
             .label_every(1)
             .label("PSI")
             .upper_label("CO2")
@@ -92,8 +98,10 @@ impl Default for State {
             .right_label("RESERVE")
             .bottom_label("PERCENT\nREMAINING")
             .left_label("MAIN")
-            .left_range(0.0..=100.0, 50)
-            .right_range(0.0..=100.0, 20)
+            .left_range(0.0, 100.0)
+            .left_label_every(50)
+            .right_range(0.0, 100.0)
+            .right_label_every(20)
             .left_value(65.0)
             .right_value(42.0)
             .font(B612);
@@ -111,10 +119,30 @@ impl Default for State {
             dual,
             walk_dual_left: RandomWalk::new(65.0, 0.0, 100.0, 0.08),
             walk_dual_right: RandomWalk::new(42.0, 0.0, 100.0, 0.06),
-            split1: HorizontalGauge::new(0.0..=30.0).label_every(10).tick_every(5).label("DC\nVOLTS").value(15.0).font(B612),
+            split1: HorizontalGauge::new(0.0, 30.0)
+                .label_every(10)
+                .tick_every(5)
+                .label("DC\nVOLTS")
+                .value(15.0)
+                .font(B612),
             walk_split1: RandomWalk::new(15.0, 0.0, 30.0, 0.05),
-            split2: HorizontalGauge::new(0.0..=50.0).label_every(10).label("DC\nAMPS").value(25.0).font(B612),
+            split2: HorizontalGauge::new(0.0, 50.0)
+                .label_every(10)
+                .label("DC\nAMPS")
+                .value(25.0)
+                .font(B612),
             walk_split2: RandomWalk::new(25.0, 0.0, 50.0, 0.08),
+            split3: HorizontalGauge::new(0.0, 150.0)
+                .label_every(50)
+                .tick_every(10)
+                .label("AC\nVOLTS")
+                .value(75.0)
+                .font(B612),
+            walk_split3: RandomWalk::new(75.0, 0.0, 150.0, 0.1),
+            rotary_selected: 2,
+            lever_h3_selected: 1,
+            lever_h2_selected: 0,
+            lever_v2_selected: 0,
             theme: cockpit,
             themes,
             ctrl_held: false,
@@ -127,6 +155,10 @@ enum Message {
     Tick,
     ThemeSelected(Theme),
     KeyboardEvent(keyboard::Event),
+    RotaryChanged(usize),
+    LeverH3Changed(usize),
+    LeverH2Changed(usize),
+    LeverV2Changed(usize),
 }
 
 fn update(state: &mut State, message: Message) {
@@ -141,6 +173,7 @@ fn update(state: &mut State, message: Message) {
             state.dual.set_right_value(state.walk_dual_right.tick());
             state.split1.set_value(state.walk_split1.tick());
             state.split2.set_value(state.walk_split2.tick());
+            state.split3.set_value(state.walk_split3.tick());
         }
         Message::ThemeSelected(theme) => state.theme = theme,
         Message::KeyboardEvent(event) => match event {
@@ -149,6 +182,10 @@ fn update(state: &mut State, message: Message) {
             }
             _ => {}
         },
+        Message::RotaryChanged(index) => state.rotary_selected = index,
+        Message::LeverH3Changed(index) => state.lever_h3_selected = index,
+        Message::LeverH2Changed(index) => state.lever_h2_selected = index,
+        Message::LeverV2Changed(index) => state.lever_v2_selected = index,
     }
 }
 
@@ -162,8 +199,8 @@ fn subscription(state: &State) -> Subscription<Message> {
 }
 
 fn view(state: &State) -> Element<'_, Message> {
-    // Layer 1: background + widgets
-    let main_canvas = iced::widget::canvas(WidgetLayer {
+    // Layer 1: background + gauge widgets (non-interactive, drawn on canvas)
+    let main_canvas = iced::widget::canvas(GaugeLayer {
         gauge_air: &state.gauge_air,
         gauge_pressure: &state.gauge_pressure,
         gauge_percent: &state.gauge_percent,
@@ -172,11 +209,63 @@ fn view(state: &State) -> Element<'_, Message> {
         dual: &state.dual,
         split1: &state.split1,
         split2: &state.split2,
+        split3: &state.split3,
     })
-        .width(Length::Fill)
-        .height(Length::Fill);
+    .width(Length::Fill)
+    .height(Length::Fill);
 
-    // Layer 2: theme picker (only when Ctrl held)
+    // Layer 2: interactive widgets (real iced widgets for mouse interaction)
+    let rotary: Element<'_, Message> = RotarySelector::new(
+        vec!["OFF", "1", "2", "3", "BOTH"],
+        state.rotary_selected,
+        Message::RotaryChanged,
+    )
+    .left_label("L")
+    .right_label("R")
+    .font(B612)
+    .width(Length::Fixed(150.0))
+    .height(Length::Fixed(150.0))
+    .into();
+
+    let lever_h3: Element<'_, Message> =
+        LeverSwitch::new(3, state.lever_h3_selected, Message::LeverH3Changed)
+            .title("CABIN FAN")
+            .labels(vec!["AUTO", "OFF", "RESET"])
+            .font(B612)
+            .width(Length::Fixed(150.0))
+            .height(Length::Fixed(150.0))
+            .into();
+
+    let lever_h2: Element<'_, Message> =
+        LeverSwitch::new(2, state.lever_h2_selected, Message::LeverH2Changed)
+            .title("PUMP")
+            .labels(vec!["ON", "OFF"])
+            .font(B612)
+            .width(Length::Fixed(150.0))
+            .height(Length::Fixed(150.0))
+            .into();
+
+    let lever_v2: Element<'_, Message> =
+        LeverSwitch::new(2, state.lever_v2_selected, Message::LeverV2Changed)
+            .orientation(LeverOrientation::Vertical)
+            .title("VALVE")
+            .labels(vec!["OPEN", "SHUT"])
+            .font(B612)
+            .width(Length::Fixed(150.0))
+            .height(Length::Fixed(150.0))
+            .into();
+
+    let inputs = iced::widget::column![
+        iced::widget::row![rotary, Space::new()],
+        iced::widget::row![lever_h3, lever_h2],
+        iced::widget::row![lever_v2, Space::new()],
+    ]
+    .spacing(5)
+    .padding(10);
+
+    let interactive_layer: Element<'_, Message> = container(inputs).into();
+
+    // Layer 3: theme picker (only when Ctrl held)
     let theme_picker: Element<'_, Message> = if state.ctrl_held {
         container(
             pick_list(state.themes.clone(), Some(&state.theme), |theme| {
@@ -190,10 +279,10 @@ fn view(state: &State) -> Element<'_, Message> {
         Space::new().into()
     };
 
-    stack![main_canvas, theme_picker].into()
+    stack![main_canvas, interactive_layer, theme_picker].into()
 }
 
-struct WidgetLayer<'a> {
+struct GaugeLayer<'a> {
     gauge_air: &'a Gauge,
     gauge_pressure: &'a Gauge,
     gauge_percent: &'a Gauge,
@@ -202,9 +291,10 @@ struct WidgetLayer<'a> {
     dual: &'a DualGauge,
     split1: &'a HorizontalGauge,
     split2: &'a HorizontalGauge,
+    split3: &'a HorizontalGauge,
 }
 
-impl<'a> canvas::Program<Message> for WidgetLayer<'a> {
+impl<'a> canvas::Program<Message> for GaugeLayer<'a> {
     type State = ();
 
     fn draw(
@@ -221,66 +311,78 @@ impl<'a> canvas::Program<Message> for WidgetLayer<'a> {
         let bg = Path::rectangle(iced::Point::ORIGIN, bounds.size());
         frame.fill(&bg, theme.palette().background);
 
-        // Place gauges in the top-right, 10% of the shorter dimension
-        let gauge_radius = bounds.width.min(bounds.height) * 0.075;
-        let margin = gauge_radius * 1.6;
+        // Grid layout: gauges on the right side
+        let gauge_radius = bounds.width.min(bounds.height) * 0.055;
+        let margin = gauge_radius * 1.8;
         let spacing = gauge_radius * 2.4;
 
-        // Cabin Pressure gauge (left position)
-        let center_pressure = iced::Point::new(
-            bounds.width - margin - spacing,
-            margin,
-        );
-        self.gauge_pressure.draw_at(&mut frame, theme, center_pressure, gauge_radius);
+        // Column x-positions (right side)
+        let col0 = bounds.width - margin - spacing * 2.0;
+        let col1 = bounds.width - margin - spacing;
+        let col2 = bounds.width - margin;
 
-        // Cabin Air gauge (right position)
-        let center_air = iced::Point::new(
-            bounds.width - margin,
-            margin,
-        );
-        self.gauge_air.draw_at(&mut frame, theme, center_air, gauge_radius);
+        // Row y-positions
+        let row = |r: usize| margin + r as f32 * spacing;
 
-        // Percent gauge (below Cabin Pressure)
-        let center_percent = iced::Point::new(
-            center_pressure.x,
-            center_pressure.y + spacing,
+        // Column 0
+        self.gauge_pressure.draw_at(
+            &mut frame,
+            theme,
+            iced::Point::new(col0, row(0)),
+            gauge_radius,
         );
-        self.gauge_percent.draw_at(&mut frame, theme, center_percent, gauge_radius);
+        self.gauge_percent.draw_at(
+            &mut frame,
+            theme,
+            iced::Point::new(col0, row(1)),
+            gauge_radius,
+        );
+        self.gauge_co2.draw_at(
+            &mut frame,
+            theme,
+            iced::Point::new(col0, row(2)),
+            gauge_radius,
+        );
+        self.split1.draw_at(
+            &mut frame,
+            theme,
+            iced::Point::new(col0, row(3)),
+            gauge_radius,
+        );
 
-        // Coolant gauge (below Cabin Air)
-        let center_coolant = iced::Point::new(
-            center_air.x,
-            center_air.y + spacing,
+        // Column 1
+        self.gauge_air.draw_at(
+            &mut frame,
+            theme,
+            iced::Point::new(col1, row(0)),
+            gauge_radius,
         );
-        self.gauge_coolant.draw_at(&mut frame, theme, center_coolant, gauge_radius);
+        self.gauge_coolant.draw_at(
+            &mut frame,
+            theme,
+            iced::Point::new(col1, row(1)),
+            gauge_radius,
+        );
+        self.dual.draw_at(
+            &mut frame,
+            theme,
+            iced::Point::new(col1, row(2)),
+            gauge_radius,
+        );
+        self.split2.draw_at(
+            &mut frame,
+            theme,
+            iced::Point::new(col1, row(3)),
+            gauge_radius,
+        );
 
-        // CO2 gauge (below Percent)
-        let center_co2 = iced::Point::new(
-            center_percent.x,
-            center_percent.y + spacing,
+        // Column 2
+        self.split3.draw_at(
+            &mut frame,
+            theme,
+            iced::Point::new(col2, row(0)),
+            gauge_radius,
         );
-        self.gauge_co2.draw_at(&mut frame, theme, center_co2, gauge_radius);
-
-        // Dual gauge (right of CO2)
-        let center_dual = iced::Point::new(
-            center_co2.x + spacing,
-            center_co2.y,
-        );
-        self.dual.draw_at(&mut frame, theme, center_dual, gauge_radius);
-
-        // Split gauge 1 (below CO2/PSI)
-        let center_split1 = iced::Point::new(
-            center_co2.x,
-            center_co2.y + spacing,
-        );
-        self.split1.draw_at(&mut frame, theme, center_split1, gauge_radius);
-
-        // Split gauge 2 (below OXYGEN dual)
-        let center_split2 = iced::Point::new(
-            center_dual.x,
-            center_dual.y + spacing,
-        );
-        self.split2.draw_at(&mut frame, theme, center_split2, gauge_radius);
 
         vec![frame.into_geometry()]
     }

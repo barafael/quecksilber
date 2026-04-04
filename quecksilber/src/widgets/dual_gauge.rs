@@ -1,6 +1,5 @@
-use iced::widget::canvas::{self, Path, Stroke, Text};
-use iced::{mouse, Element, Font, Length, Point, Radians, Rectangle, Renderer, Theme};
-use std::ops::RangeInclusive;
+use iced::widget::canvas::{self, Path, Stroke};
+use iced::{Element, Font, Length, Point, Radians, Rectangle, Renderer, Theme, mouse};
 
 /// A dual-gauge widget displaying two values on a single circular face.
 pub struct DualGauge {
@@ -9,10 +8,12 @@ pub struct DualGauge {
     bottom_label: String,
     left_label: String,
     font: Font,
-    left_range: RangeInclusive<f32>,
+    left_min: f32,
+    left_max: f32,
     left_label_every: u32,
     left_value: f32,
-    right_range: RangeInclusive<f32>,
+    right_min: f32,
+    right_max: f32,
     right_label_every: u32,
     right_value: f32,
 }
@@ -25,10 +26,12 @@ impl DualGauge {
             bottom_label: String::new(),
             left_label: String::new(),
             font: Font::default(),
-            left_range: 0.0..=100.0,
+            left_min: 0.0,
+            left_max: 100.0,
             left_label_every: 10,
             left_value: 0.0,
-            right_range: 0.0..=100.0,
+            right_min: 0.0,
+            right_max: 100.0,
             right_label_every: 10,
             right_value: 0.0,
         }
@@ -59,15 +62,25 @@ impl DualGauge {
         self
     }
 
-    pub fn left_range(mut self, range: RangeInclusive<f32>, label_every: u32) -> Self {
-        self.left_range = range;
-        self.left_label_every = label_every;
+    pub fn left_range(mut self, min: f32, max: f32) -> Self {
+        self.left_min = min;
+        self.left_max = max;
         self
     }
 
-    pub fn right_range(mut self, range: RangeInclusive<f32>, label_every: u32) -> Self {
-        self.right_range = range;
-        self.right_label_every = label_every;
+    pub fn right_range(mut self, min: f32, max: f32) -> Self {
+        self.right_min = min;
+        self.right_max = max;
+        self
+    }
+
+    pub fn left_label_every(mut self, n: u32) -> Self {
+        self.left_label_every = n;
+        self
+    }
+
+    pub fn right_label_every(mut self, n: u32) -> Self {
+        self.right_label_every = n;
         self
     }
 
@@ -106,12 +119,11 @@ impl DualGauge {
         inner_radius: f32,
         start_angle: f32,
         end_angle: f32,
-        range: &RangeInclusive<f32>,
+        min: f32,
+        max: f32,
         value: f32,
         full_radius: f32,
     ) {
-        let min = *range.start();
-        let max = *range.end();
         let range_span = max - min;
         let t = ((value - min) / range_span).clamp(0.0, 1.0);
         let sweep = end_angle - start_angle;
@@ -168,12 +180,11 @@ impl DualGauge {
         arc_radius: f32,
         start_angle: f32,
         end_angle: f32,
-        range: &RangeInclusive<f32>,
+        min: f32,
+        max: f32,
         label_every: u32,
         full_radius: f32,
     ) {
-        let min = *range.start();
-        let max = *range.end();
         let range_span = max - min;
         let sweep = end_angle - start_angle;
 
@@ -207,8 +218,16 @@ impl DualGauge {
             let is_endpoint = (val - min).abs() < 0.01 || (val - max).abs() < 0.01;
             let show_label = is_label_tick || is_endpoint;
 
-            let tick_len = if show_label { tick_len_label } else { tick_len_small };
-            let tick_w = if show_label { tick_w_label } else { tick_w_small };
+            let tick_len = if show_label {
+                tick_len_label
+            } else {
+                tick_len_small
+            };
+            let tick_w = if show_label {
+                tick_w_label
+            } else {
+                tick_w_small
+            };
 
             let outer = Point::new(
                 arc_center.x + cos * arc_radius,
@@ -220,27 +239,20 @@ impl DualGauge {
             );
 
             let tick = Path::line(inner, outer);
-            frame.stroke(
-                &tick,
-                Stroke::default().with_color(fg).with_width(tick_w),
-            );
+            frame.stroke(&tick, Stroke::default().with_color(fg).with_width(tick_w));
 
             if show_label {
                 let label_pos = Point::new(
                     arc_center.x + cos * (arc_radius - tick_len - label_offset),
                     arc_center.y + sin * (arc_radius - tick_len - label_offset),
                 );
-                let text = Text {
-                    content: format!("{}", val as i32),
-                    position: label_pos,
-                    size: label_size.into(),
-                    color: fg,
-                    font: self.font,
-                    align_x: iced::alignment::Horizontal::Center.into(),
-                    align_y: iced::alignment::Vertical::Center.into(),
-                    ..Text::default()
-                };
-                frame.fill_text(text);
+                frame.fill_text(crate::centered_text(
+                    format!("{}", val as i32),
+                    label_pos,
+                    label_size,
+                    fg,
+                    self.font,
+                ));
             }
         }
     }
@@ -265,11 +277,11 @@ impl DualGauge {
         // Vertical line: x at 1/5 off the rightmost point of the big circle
         let line_x = center.x + full_radius * 0.64;
         let dx_big = line_x - center.x;
-        let half_chord = (full_radius * full_radius - dx_big * dx_big).max(0.0).sqrt();
+        let half_chord = crate::half_chord(full_radius, dx_big);
         let y_top = center.y - half_chord;
         let y_bottom = center.y + half_chord;
 
-        let warn_stroke = canvas::Stroke::default()
+        let stroke = canvas::Stroke::default()
             .with_color(fg)
             .with_width((full_radius * 0.015).max(1.0));
 
@@ -277,19 +289,21 @@ impl DualGauge {
         let right_small_cx = center.x + full_radius - small_r;
         let right_small_cy = center.y;
         let dx_small = line_x - right_small_cx;
-        let arc_r_pre = small_r * 1.16;
-        let small_half_chord = (arc_r_pre * arc_r_pre - dx_small * dx_small).max(0.0).sqrt();
+        let arc_r = small_r * 1.16;
+        let small_half_chord = crate::half_chord(arc_r, dx_small);
         let y_small_top = right_small_cy - small_half_chord;
         let y_small_bottom = right_small_cy + small_half_chord;
 
         // Vertical line split: above and below the small circle
         let line_top = Path::line(Point::new(line_x, y_top), Point::new(line_x, y_small_top));
-        frame.stroke(&line_top, warn_stroke);
-        let line_bottom = Path::line(Point::new(line_x, y_small_bottom), Point::new(line_x, y_bottom));
-        frame.stroke(&line_bottom, warn_stroke);
+        frame.stroke(&line_top, stroke);
+        let line_bottom = Path::line(
+            Point::new(line_x, y_small_bottom),
+            Point::new(line_x, y_bottom),
+        );
+        frame.stroke(&line_bottom, stroke);
 
         // Arc: left half of the rightmost small circle area, slightly larger
-        let arc_r = small_r * 1.16;
         let arc_intersect = (dx_small / arc_r).clamp(-1.0, 1.0).acos();
         let arc_path = Path::new(|b| {
             b.arc(canvas::path::Arc {
@@ -299,7 +313,7 @@ impl DualGauge {
                 end_angle: Radians(-arc_intersect + 2.0 * std::f32::consts::PI),
             });
         });
-        frame.stroke(&arc_path, warn_stroke);
+        frame.stroke(&arc_path, stroke);
 
         // Larger gauge arc on the right side (same center, 3x radius)
         let gauge_arc_r = arc_r * 2.58;
@@ -314,29 +328,33 @@ impl DualGauge {
                 end_angle: Radians(-gauge_intersect - gauge_margin + 2.0 * std::f32::consts::PI),
             });
         });
-        frame.stroke(&gauge_arc_right, warn_stroke);
+        frame.stroke(&gauge_arc_right, stroke);
 
         // Ticks on the right gauge arc (0 at bottom, values increase upward)
         self.draw_arc_ticks(
-            frame, fg,
+            frame,
+            fg,
             Point::new(right_small_cx, right_small_cy),
             gauge_arc_r,
             gauge_intersect + gauge_margin,
             -gauge_intersect - gauge_margin + 2.0 * std::f32::consts::PI,
-            &self.right_range,
+            self.right_min,
+            self.right_max,
             self.right_label_every,
             full_radius,
         );
 
         // Arm on the right gauge
         self.draw_arm(
-            frame, fg,
+            frame,
+            fg,
             Point::new(right_small_cx, right_small_cy),
             gauge_arc_r,
             arc_r,
             gauge_intersect + gauge_margin,
             -gauge_intersect - gauge_margin + 2.0 * std::f32::consts::PI,
-            &self.right_range,
+            self.right_min,
+            self.right_max,
             self.right_value,
             full_radius,
         );
@@ -344,21 +362,27 @@ impl DualGauge {
         // Mirror on the left side
         let line_x_left = center.x - full_radius * 0.64;
         let dx_big_left = line_x_left - center.x;
-        let half_chord_left = (full_radius * full_radius - dx_big_left * dx_big_left).max(0.0).sqrt();
+        let half_chord_left = crate::half_chord(full_radius, dx_big_left);
         let y_top_left = center.y - half_chord_left;
         let y_bottom_left = center.y + half_chord_left;
 
         let left_small_cx = center.x - full_radius + small_r;
         let left_small_cy = center.y;
         let dx_small_left = line_x_left - left_small_cx;
-        let small_half_chord_left = (arc_r_pre * arc_r_pre - dx_small_left * dx_small_left).max(0.0).sqrt();
+        let small_half_chord_left = crate::half_chord(arc_r, dx_small_left);
         let y_small_top_left = left_small_cy - small_half_chord_left;
         let y_small_bottom_left = left_small_cy + small_half_chord_left;
 
-        let line_top_left = Path::line(Point::new(line_x_left, y_top_left), Point::new(line_x_left, y_small_top_left));
-        frame.stroke(&line_top_left, warn_stroke);
-        let line_bottom_left = Path::line(Point::new(line_x_left, y_small_bottom_left), Point::new(line_x_left, y_bottom_left));
-        frame.stroke(&line_bottom_left, warn_stroke);
+        let line_top_left = Path::line(
+            Point::new(line_x_left, y_top_left),
+            Point::new(line_x_left, y_small_top_left),
+        );
+        frame.stroke(&line_top_left, stroke);
+        let line_bottom_left = Path::line(
+            Point::new(line_x_left, y_small_bottom_left),
+            Point::new(line_x_left, y_bottom_left),
+        );
+        frame.stroke(&line_bottom_left, stroke);
 
         let arc_intersect_left = (dx_small_left / arc_r).clamp(-1.0, 1.0).acos();
         let arc_path_left = Path::new(|b| {
@@ -369,7 +393,7 @@ impl DualGauge {
                 end_angle: Radians(arc_intersect_left),
             });
         });
-        frame.stroke(&arc_path_left, warn_stroke);
+        frame.stroke(&arc_path_left, stroke);
 
         // Larger gauge arc on the left side (same center, 3x radius)
         let gauge_dx_left = dx_small_left / gauge_arc_r;
@@ -382,53 +406,65 @@ impl DualGauge {
                 end_angle: Radians(gauge_intersect_left - gauge_margin),
             });
         });
-        frame.stroke(&gauge_arc_left, warn_stroke);
+        frame.stroke(&gauge_arc_left, stroke);
 
         // Ticks on the left gauge arc (0 at bottom, values increase upward)
         self.draw_arc_ticks(
-            frame, fg,
+            frame,
+            fg,
             Point::new(left_small_cx, left_small_cy),
             gauge_arc_r,
             gauge_intersect_left - gauge_margin,
             -gauge_intersect_left + gauge_margin,
-            &self.left_range,
+            self.left_min,
+            self.left_max,
             self.left_label_every,
             full_radius,
         );
 
         // Arm on the left gauge
         self.draw_arm(
-            frame, fg,
+            frame,
+            fg,
             Point::new(left_small_cx, left_small_cy),
             gauge_arc_r,
             arc_r,
             gauge_intersect_left - gauge_margin,
             -gauge_intersect_left + gauge_margin,
-            &self.left_range,
+            self.left_min,
+            self.left_max,
             self.left_value,
             full_radius,
         );
 
         let labels = [
-            (&self.top_label, Point::new(center.x, center.y - full_radius * 0.74)),
-            (&self.right_label, Point::new(center.x + full_radius * 0.74, center.y)),
-            (&self.bottom_label, Point::new(center.x, center.y + full_radius * 0.74)),
-            (&self.left_label, Point::new(center.x - full_radius * 0.74, center.y)),
+            (
+                &self.top_label,
+                Point::new(center.x, center.y - full_radius * 0.74),
+            ),
+            (
+                &self.right_label,
+                Point::new(center.x + full_radius * 0.74, center.y),
+            ),
+            (
+                &self.bottom_label,
+                Point::new(center.x, center.y + full_radius * 0.74),
+            ),
+            (
+                &self.left_label,
+                Point::new(center.x - full_radius * 0.74, center.y),
+            ),
         ];
 
         for (content, position) in labels {
             if !content.is_empty() {
-                let text = Text {
-                    content: content.clone(),
+                frame.fill_text(crate::centered_text(
+                    content.clone(),
                     position,
-                    size: font_size.into(),
-                    color: fg,
-                    font: self.font,
-                    align_x: iced::alignment::Horizontal::Center.into(),
-                    align_y: iced::alignment::Vertical::Center.into(),
-                    ..Text::default()
-                };
-                frame.fill_text(text);
+                    font_size,
+                    fg,
+                    self.font,
+                ));
             }
         }
     }

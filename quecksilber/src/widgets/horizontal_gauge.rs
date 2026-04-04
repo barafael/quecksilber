@@ -1,12 +1,12 @@
-use iced::widget::canvas::{self, Path, Stroke, Text};
-use iced::{mouse, Element, Font, Length, Point, Radians, Rectangle, Renderer, Theme};
-use std::ops::RangeInclusive;
+use iced::widget::canvas::{self, Path, Stroke};
+use iced::{Element, Font, Length, Point, Radians, Rectangle, Renderer, Theme, mouse};
 
 /// A circular gauge with a horizontal divider line near the lower quarter.
 /// The line has a circular arc segment where it crosses an inner circle.
 pub struct HorizontalGauge {
     font: Font,
-    range: RangeInclusive<f32>,
+    min: f32,
+    max: f32,
     label_every: u32,
     tick_every: Option<u32>,
     value: f32,
@@ -14,10 +14,11 @@ pub struct HorizontalGauge {
 }
 
 impl HorizontalGauge {
-    pub fn new(range: RangeInclusive<f32>) -> Self {
+    pub fn new(min: f32, max: f32) -> Self {
         Self {
             font: Font::default(),
-            range,
+            min,
+            max,
             label_every: 10,
             tick_every: None,
             value: 0.0,
@@ -84,7 +85,7 @@ impl HorizontalGauge {
 
         // Where the horizontal line intersects the big circle
         let dy_big = line_y - center.y;
-        let half_chord_big = (full_radius * full_radius - dy_big * dy_big).max(0.0).sqrt();
+        let half_chord_big = crate::half_chord(full_radius, dy_big);
         let x_left = center.x - half_chord_big;
         let x_right = center.x + half_chord_big;
 
@@ -94,16 +95,14 @@ impl HorizontalGauge {
 
         // Where the horizontal line intersects the arc
         let dy_arc = line_y - arc_center_y;
-        let inner_half_chord = (arc_r * arc_r - dy_arc * dy_arc).max(0.0).sqrt();
+        let inner_half_chord = crate::half_chord(arc_r, dy_arc);
         let x_inner_left = (center.x - inner_half_chord).max(x_left);
         let x_inner_right = (center.x + inner_half_chord).min(x_right);
 
         // Horizontal line split: left and right of the inner arc (only if there's space)
         if x_inner_left > x_left + 1.0 {
-            let line_left = Path::line(
-                Point::new(x_left, line_y),
-                Point::new(x_inner_left, line_y),
-            );
+            let line_left =
+                Path::line(Point::new(x_left, line_y), Point::new(x_inner_left, line_y));
             frame.stroke(&line_left, stroke);
         }
 
@@ -133,7 +132,9 @@ impl HorizontalGauge {
         let gauge_center_y = arc_center_y - full_radius * 0.22;
         let gauge_center_pt = Point::new(center.x, gauge_center_y);
         let gauge_margin = 0.6;
-        let gauge_intersect = ((line_y - gauge_center_y) / gauge_arc_r).clamp(-1.0, 1.0).asin();
+        let gauge_intersect = ((line_y - gauge_center_y) / gauge_arc_r)
+            .clamp(-1.0, 1.0)
+            .asin();
         let gauge_arc = Path::new(|b| {
             b.arc(canvas::path::Arc {
                 center: gauge_center_pt,
@@ -145,8 +146,8 @@ impl HorizontalGauge {
         frame.stroke(&gauge_arc, stroke);
 
         // Ticks on the gauge arc (0 at right/bottom, max at left/bottom)
-        let min = *self.range.start();
-        let max = *self.range.end();
+        let min = self.min;
+        let max = self.max;
         let range_span = max - min;
         let label_step = self.label_every.max(1) as f32;
         let tick_step = match self.tick_every {
@@ -183,8 +184,16 @@ impl HorizontalGauge {
             let is_endpoint = (val - min).abs() < 0.01 || (val - max).abs() < 0.01;
             let show_label = is_label_tick || is_endpoint;
 
-            let tick_len = if show_label { tick_len_label } else { tick_len_small };
-            let tick_w = if show_label { tick_w_label } else { tick_w_small };
+            let tick_len = if show_label {
+                tick_len_label
+            } else {
+                tick_len_small
+            };
+            let tick_w = if show_label {
+                tick_w_label
+            } else {
+                tick_w_small
+            };
 
             let outer = Point::new(
                 gauge_center_pt.x + cos * gauge_arc_r,
@@ -204,40 +213,29 @@ impl HorizontalGauge {
                     gauge_center_pt.x + cos * label_r,
                     gauge_center_pt.y + sin * label_r,
                 );
-                let text = Text {
-                    content: format!("{}", val as i32),
-                    position: label_pos,
-                    size: label_size.into(),
-                    color: fg,
-                    font: self.font,
-                    align_x: iced::alignment::Horizontal::Center.into(),
-                    align_y: iced::alignment::Vertical::Center.into(),
-                    ..Text::default()
-                };
-                frame.fill_text(text);
+                frame.fill_text(crate::centered_text(
+                    format!("{}", val as i32),
+                    label_pos,
+                    label_size,
+                    fg,
+                    self.font,
+                ));
             }
         }
 
         // Center label
         if !self.label.is_empty() {
             let label_pos = Point::new(center.x, center.y);
-            let label_text = Text {
-                content: self.label.clone(),
-                position: label_pos,
-                size: (full_radius * 0.14).into(),
-                color: fg,
-                font: self.font,
-                align_x: iced::alignment::Horizontal::Center.into(),
-                align_y: iced::alignment::Vertical::Center.into(),
-                ..Text::default()
-            };
-            frame.fill_text(label_text);
+            frame.fill_text(crate::centered_text(
+                self.label.clone(),
+                label_pos,
+                full_radius * 0.14,
+                fg,
+                self.font,
+            ));
         }
 
         // Arm (blunt style, pivot at gauge arc center, starts after small arc)
-        let min = *self.range.start();
-        let max = *self.range.end();
-        let range_span = max - min;
         let t = ((self.value - min) / range_span).clamp(0.0, 1.0);
         let arm_angle = tick_start + t * tick_sweep;
         let cos = arm_angle.cos();
