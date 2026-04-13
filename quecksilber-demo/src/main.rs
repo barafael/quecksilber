@@ -244,8 +244,8 @@ fn view(state: &State) -> Element<'_, Message> {
     .left_label("L")
     .right_label("R")
     .font(B612)
-    .width(Length::Fixed(150.0))
-    .height(Length::Fixed(150.0))
+    .width(Length::FillPortion(1))
+    .height(Length::FillPortion(1))
     .into();
 
     let lever_h3: Element<'_, Message> =
@@ -253,8 +253,8 @@ fn view(state: &State) -> Element<'_, Message> {
             .title("CABIN FAN")
             .labels(vec!["AUTO", "OFF", "RESET"])
             .font(B612)
-            .width(Length::Fixed(150.0))
-            .height(Length::Fixed(150.0))
+            .width(Length::FillPortion(1))
+            .height(Length::FillPortion(1))
             .into();
 
     let lever_h2: Element<'_, Message> =
@@ -262,8 +262,8 @@ fn view(state: &State) -> Element<'_, Message> {
             .title("PUMP")
             .labels(vec!["ON", "OFF"])
             .font(B612)
-            .width(Length::Fixed(150.0))
-            .height(Length::Fixed(150.0))
+            .width(Length::FillPortion(1))
+            .height(Length::FillPortion(1))
             .into();
 
     let lever_v2: Element<'_, Message> =
@@ -272,17 +272,19 @@ fn view(state: &State) -> Element<'_, Message> {
             .title("VALVE")
             .labels(vec!["OPEN", "SHUT"])
             .font(B612)
-            .width(Length::Fixed(150.0))
-            .height(Length::Fixed(150.0))
+            .width(Length::FillPortion(1))
+            .height(Length::FillPortion(1))
             .into();
 
     let inputs = iced::widget::column![
-        iced::widget::row![rotary, Space::new()],
-        iced::widget::row![lever_h3, lever_h2],
-        iced::widget::row![lever_v2, Space::new()],
+        iced::widget::row![rotary, Space::new()].height(Length::FillPortion(1)),
+        iced::widget::row![lever_h3, lever_h2].height(Length::FillPortion(1)),
+        iced::widget::row![lever_v2, Space::new()].height(Length::FillPortion(1)),
     ]
     .spacing(5)
-    .padding(10);
+    .padding(10)
+    .width(Length::Fixed(320.0))
+    .height(Length::Fill);
 
     let interactive_layer: Element<'_, Message> = container(inputs).into();
 
@@ -334,18 +336,30 @@ impl<'a> canvas::Program<Message> for GaugeLayer<'a> {
         let bg = Path::rectangle(iced::Point::ORIGIN, bounds.size());
         frame.fill(&bg, theme.palette().background);
 
-        // Grid layout: gauges on the right side
-        let gauge_radius = bounds.width.min(bounds.height) * 0.055;
-        let margin = gauge_radius * 1.8;
+        // Layout: three zones side by side
+        //   Left:   interactive controls (handled by iced widget layer)
+        //   Center: attitude indicators
+        //   Right:  gauge grid (3 cols x 4 rows)
+
+        // Gauge sizing: fit 4 rows vertically and 3 columns in the right zone.
+        // gauge_radius is derived from available height (4 rows need ~9.6 * radius)
+        // and from available width (right zone ~45% of width, 3 cols need ~7.2 * radius).
+        let gauge_radius = (bounds.height / 10.5).min(bounds.width * 0.45 / 7.2);
         let spacing = gauge_radius * 2.4;
 
-        // Column x-positions (right side)
-        let col0 = bounds.width - margin - spacing * 2.0;
-        let col1 = bounds.width - margin - spacing;
-        let col2 = bounds.width - margin;
+        // Right zone: 3 columns of gauges
+        let right_zone_width = spacing * 3.0;
+        let right_zone_x = bounds.width - right_zone_width;
 
-        // Row y-positions
-        let row = |r: usize| margin + r as f32 * spacing;
+        // Column x-positions (within right zone)
+        let col0 = right_zone_x + spacing * 0.5;
+        let col1 = right_zone_x + spacing * 1.5;
+        let col2 = right_zone_x + spacing * 2.5;
+
+        // Row y-positions (vertically centered)
+        let total_grid_height = spacing * 3.0;
+        let grid_top = (bounds.height - total_grid_height) / 2.0;
+        let row = |r: usize| grid_top + r as f32 * spacing;
 
         // Column 0
         self.gauge_pressure.draw_at(
@@ -407,15 +421,25 @@ impl<'a> canvas::Program<Message> for GaugeLayer<'a> {
             gauge_radius,
         );
 
-        // Attitude indicator
-        let att_radius = gauge_radius * 2.0;
-        let att_center = iced::Point::new(bounds.width / 2.0, margin + att_radius);
+        // Attitude indicators: centered in the zone between controls and gauges.
+        // The stack (attitude + rate indicator) needs ~6.8 * att_radius vertically.
+        let center_zone_x = bounds.width * 0.2;
+        let center_zone_width = right_zone_x - center_zone_x;
+        let att_max_by_width = center_zone_width * 0.28;
+        let att_max_by_height = bounds.height / 6.8;
+        let att_radius = att_max_by_width.min(att_max_by_height);
+        let att_center_x = center_zone_x + center_zone_width / 2.0;
+
+        // Vertically center the entire attitude stack
+        let rate_indicator_half = att_radius * 1.4;
+        let gap = att_radius * 0.4;
+        let total_att_height = att_radius * 2.0 + gap + rate_indicator_half * 2.0;
+        let att_top = (bounds.height - total_att_height) / 2.0;
+        let att_center = iced::Point::new(att_center_x, att_top + att_radius);
 
         // AttitudeRateIndicator: below the attitude indicator
-        let rate_indicator_half = att_radius * 1.4;
-        let rate_indicator_center_y =
-            att_center.y + att_radius + rate_indicator_half + margin * 0.5;
-        let rate_indicator_center = iced::Point::new(bounds.width / 2.0, rate_indicator_center_y);
+        let rate_indicator_center_y = att_center.y + att_radius + gap + rate_indicator_half;
+        let rate_indicator_center = iced::Point::new(att_center_x, rate_indicator_center_y);
         self.rate_indicator.draw_at(
             &mut frame,
             theme,
