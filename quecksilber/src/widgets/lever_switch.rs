@@ -185,7 +185,7 @@ impl<'a, Message> LeverSwitch<'a, Message> {
         );
 
         // -- Knob: offset circle that slides to indicate position (1.5x stroke) --
-        let knob_travel = lever_base_r * 0.52;
+        let knob_travel = lever_base_r * 0.75;
         let linear_offset = (frac - 0.5) * 2.0 * knob_travel;
 
         let knob_center = if is_horizontal {
